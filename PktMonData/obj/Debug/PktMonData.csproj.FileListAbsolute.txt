@@ -1,0 +1,6 @@
+C:\WAC-SDN\PayloadParserService\PktMonData\bin\Debug\PktMonData.exe.config
+C:\WAC-SDN\PayloadParserService\PktMonData\bin\Debug\PktMonData.exe
+C:\WAC-SDN\PayloadParserService\PktMonData\bin\Debug\PktMonData.pdb
+C:\WAC-SDN\PayloadParserService\PktMonData\obj\Debug\PktMonData.csproj.CoreCompileInputs.cache
+C:\WAC-SDN\PayloadParserService\PktMonData\obj\Debug\PktMonData.exe
+C:\WAC-SDN\PayloadParserService\PktMonData\obj\Debug\PktMonData.pdb
