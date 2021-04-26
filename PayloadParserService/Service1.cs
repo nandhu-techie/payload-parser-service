@@ -11,16 +11,22 @@ using Newtonsoft.Json.Linq;
 using Microsoft.Diagnostics.Tracing;
 using System.Net;
 using System.Text.RegularExpressions;
+using System.Threading;
 
 namespace PayloadParserService
 {
     public partial class Service1 : ServiceBase
     {
-        Timer timer = new Timer();
-        string outputText = "";
 
+
+        public bool serviceStarted;
+        Thread processdataThread;
+      
+        List<Report> resultList;
+        List<ComponentInfo> componentList;
         public Service1()
         {
+            serviceStarted = false;
             InitializeComponent();
         }
 
@@ -28,13 +34,23 @@ namespace PayloadParserService
         {
             try
             {
-                string wiresharkDissetorPath = Environment.GetEnvironmentVariable(PacketMonCommon.wiresharkInstallDirEnvVar, EnvironmentVariableTarget.Machine);
-                string etlFilePath = Environment.GetEnvironmentVariable(PacketMonCommon.parserfilepath, EnvironmentVariableTarget.Machine) + "PktMon.etl";
-                this.ProcessData(etlFilePath, wiresharkDissetorPath);
 
-                timer.Elapsed += new ElapsedEventHandler(OnElapsedTime);
-                timer.Interval = 5000; //number in miliseconds  
-                timer.Enabled = true;
+                ThreadStart start = new ThreadStart(ProcessData);
+                processdataThread = new Thread(start);
+
+                // set flag to indicate worker thread is active
+                serviceStarted = true;
+
+                // start threads
+                processdataThread.Start();
+
+                // string wiresharkDissetorPath = Environment.GetEnvironmentVariable(PacketMonCommon.wiresharkInstallDirEnvVar, EnvironmentVariableTarget.Machine);
+                // string etlFilePath = Environment.GetEnvironmentVariable(PacketMonCommon.parserfilepath, EnvironmentVariableTarget.Machine) + "\\PktMon.etl";
+                // this.ProcessData(etlFilePath);
+
+                //timer.Elapsed += new ElapsedEventHandler(OnElapsedTime);
+                //timer.Interval = 5000; //number in miliseconds  
+                //timer.Enabled = true;
             }
             catch (Exception ex)
             {
@@ -42,106 +58,50 @@ namespace PayloadParserService
             }
         }
 
-        public void ProcessData(string etlFilePath, string wiresharkDissetorPath)
+        private void ProcessData()
         {
             try
             {
-                List<Report> resultList = new List<Report>();
-                List<ComponentInfo> components = new List<ComponentInfo>();
+                string outputText = "";
+                string etlFilePath = Environment.GetEnvironmentVariable(PacketMonCommon.parserfilepath, EnvironmentVariableTarget.Machine) + "\\PktMon.etl";
+                resultList = new List<Report>();
+                componentList = new List<ComponentInfo>();
 
                 using (var source = new ETWTraceEventSource(etlFilePath))
                 {
                     source.Dynamic.All += delegate (TraceEvent data)
                     {
                         Report report = new Report();
-
                         TraceEventType eventType = TraceEventType.ETW;
-
-                        Dictionary<string, string> eInfo = new Dictionary<string, string>();
-                        eInfo.Add("Event Type", GetEventType(data, GetPacketCaptureType(data), eventType));
-                        eInfo.Add("Event ID", data.ID.ToString());
-                        eInfo.Add("Event Keyword", SetEventName((int)data.Keywords));
-                        eInfo.Add("Provider Name", data.ProviderName.ToString());
-                        eInfo.Add("Provider Guid", data.ProviderGuid.ToString());
-                        eInfo.Add("Timestamp", data.TimeStamp.ToString());
-                        eInfo.Add("Opcode", data.Opcode.ToString());
-                        eInfo.Add("Level", data.Level.ToString());
-                        eInfo.Add("Channel", data.Channel.ToString());
-                        eInfo.Add("Processor Number", data.ProcessorNumber.ToString());
-                        eInfo.Add("Process ID", data.ProcessID.ToString());
-                        eInfo.Add("Thread ID", data.ThreadID.ToString());
+                        //report.EventTime = data.TimeStamp;
+                        //report.EventType = GetEventType(data, GetPacketCaptureType(data), eventType);
 
                         Dictionary<string, string> eProperties = new Dictionary<string, string>();
 
-                        Dictionary<string, string> layers = new Dictionary<string, string>();
+                        // get Event info
+                        //Dictionary<string, string> eInfo = GetEventInfoList(data, eventType);
 
 
-                        report.EventTime = data.TimeStamp;
-                        report.EventType = GetEventType(data, GetPacketCaptureType(data), eventType);
-
-                        var list = data.PayloadNames.ToList().Where(e => e == "Payload");
 
                         if (data.PayloadNames.Length == 4)
                         {
-                            ComponentInfo componentInfo = new ComponentInfo();
-                            foreach (var item in data.PayloadNames)
-                            {
-                                if (item == "Id")
-                                {
-                                    componentInfo.Id = data.PayloadByName("Id").ToString();
-                                }
-                                else if (item == "Type")
-                                {
-                                    componentInfo.Type = data.PayloadByName("Type").ToString();
-
-                                }
-                                else if (item == "Name")
-                                {
-                                    componentInfo.Name = data.PayloadByName("Name").ToString();
-
-                                }
-                                else if (item == "Description")
-                                {
-                                    componentInfo.Description = data.PayloadByName("Description").ToString();
-
-                                }
-                            }
-                            components.Add(componentInfo);
-
+                            // component list
+                            ComponentInfo componentInfo = GetComponentInfoDetails(data);
+                            componentList.Add(componentInfo);
                         }
-                        else
+                        //else
+                        //{
+                        //    // get Event properties
+                        //    eProperties = GetEventPropertiesDetails(data);
+                        //}
+
+                        var payloadList = data.PayloadNames.ToList().Where(e => e == "Payload");
+                        if (payloadList.Count() == 1)
                         {
-                            foreach (var item in data.PayloadNames)
-                            {
-                                Type tp = data.PayloadByName(item).GetType();
-                                string value = "";
-                                if (tp.Equals(typeof(byte[])))
-                                {
-                                    byte[] bytearray;
-                                    bytearray = (byte[])(data.PayloadByName(item));
-                                    value = BitConverter.ToString(bytearray);
-                                }
-                                else
-                                {
-                                    if (item == "DestinationIP" || item == "SourceIP")
-                                    {
-                                        value = new IPAddress(BitConverter.GetBytes((int)data.PayloadByName(item)).ToArray()).ToString();
-                                    }
-                                    else
-                                    {
-                                        value = data.PayloadByName(item).ToString();
-                                    }
-                                }
-                                string keyName = Regex.Replace(item, "[A-Z]", " $0").Trim();
-                                eProperties.Add(keyName, value);
-                            }
-                        }
-                        if (list.Count() == 1)
-                        {
-                            Byte[] payld = (Byte[])data.PayloadByName("Payload");
-                            int originalPayloadSize =Convert.ToInt32( data.PayloadByName("OriginalPayloadSize"));
-                            bool isNodata = PktMonDecodeData.TryGetDecodedPayload( payld, false, originalPayloadSize, PktMonData.WiresharkPacketType.Ethernet, out string decodedPayloadString, out int err);
-                            if (!isNodata)
+                            byte[] payld = (byte[])data.PayloadByName("Payload");
+                            int originalPayloadSize = Convert.ToInt32(data.PayloadByName("OriginalPayloadSize"));
+                            bool isData = PktMonDecodeData.TryGetDecodedPayload(payld, false, originalPayloadSize, PktMonData.WiresharkPacketType.Ethernet, out string decodedPayloadString, out int err);
+                            if (!isData)
                             {
                                 WiresharkSummary wiresharkSummary = Newtonsoft.Json.JsonConvert.DeserializeObject<WiresharkSummary>(decodedPayloadString);
                                 report.Message = wiresharkSummary.summary;
@@ -149,16 +109,13 @@ namespace PayloadParserService
                                 report.Destination = wiresharkSummary.dst_addr;
                                 report.Protocol = wiresharkSummary.protocol;
                                 report.ComponentId = data.PayloadByName("ComponentId").ToString();
-
-                                // get full data
-                                PktMonDecodeData.TryGetDecodedPayload( payld, true, originalPayloadSize, PktMonData.WiresharkPacketType.Ethernet, out string decodPayloadString, out int er);
-                                JObject rss = JObject.Parse(decodPayloadString);
-                                JObject results = JsonConvert.DeserializeObject<JObject>(rss["_source"]["layers"].ToString());
-                                var jsonvalue = JObject.Parse(decodPayloadString);
-                              
-                                report.Layers = jsonvalue;
-                                report.EventInfos = eInfo;
-                                report.EventPropertiesList = eProperties;
+                                report.EventTime = data.TimeStamp;
+                                report.EventType = GetEventType(data, GetPacketCaptureType(data), eventType);
+                                // get complete payload data
+                                PktMonDecodeData.TryGetDecodedPayload(payld, true, originalPayloadSize, PktMonData.WiresharkPacketType.Ethernet, out string decodPayloadString, out int er);
+                                report.Layers = JObject.Parse(decodPayloadString);
+                                report.EventInfos = GetEventInfoList(data, eventType);
+                                report.EventPropertiesList = GetEventPropertiesDetails(data);
                                 resultList.Add(report);
                             }
                             else
@@ -168,12 +125,13 @@ namespace PayloadParserService
                         }
                         //else
                         //{
+                        //      // ETW Events
                         //    if (data.FormattedMessage != null)
                         //    {
-                        //        eInfo.Add(GetEventInfo("Message", data.FormattedMessage.ToString()));
+                        //      //  eInfo.Add(GetEventInfo("Message", data.FormattedMessage.ToString()));
                         //        report.Message = data.FormattedMessage;
                         //        report.EventInfos = eInfo;
-                        //        report.EventPropetiesList = eProperties;
+                        //     //   report.EventPropetiesList = eProperties;
                         //        resultList.Add(report);
                         //    }
 
@@ -182,23 +140,97 @@ namespace PayloadParserService
                     source.Process();
                 }
 
-                resultList.ForEach((itm) =>
+
+                foreach (var component in componentList)
                 {
-                    int index = resultList.IndexOf(itm);
-                    var componentInfo = components.Where(x => x.Id == itm.ComponentId);
-                    if (componentInfo.ToList().Count > 0)
+                    resultList.Where(S => S.ComponentId == component.Id).ToList().ForEach(item =>
                     {
-                        itm.ComponentDescription = componentInfo.ToList()[0].Description;
-                        resultList[index].ComponentDescription = itm.ComponentDescription;
-                    }
-                });
+                        item.ComponentDescription = component.Description;
+                    });
+                }
+
                 outputText = JsonConvert.SerializeObject(resultList, Formatting.Indented);
+                WriteToFile(outputText);
+
             }
             catch (Exception ex)
             {
                 WriteToFile(DateTime.Now + "Error  : " + ex.Message.ToString() + ex.InnerException.ToString(), "Error");
             }
 
+        }
+
+        public ComponentInfo GetComponentInfoDetails(dynamic data)
+        {
+            ComponentInfo componentInfo = new ComponentInfo();
+            foreach (var item in data.PayloadNames)
+            {
+                if (item == "Id")
+                {
+                    componentInfo.Id = data.PayloadByName("Id").ToString();
+                }
+                else if (item == "Type")
+                {
+                    componentInfo.Type = data.PayloadByName("Type").ToString();
+                }
+                else if (item == "Name")
+                {
+                    componentInfo.Name = data.PayloadByName("Name").ToString();
+                }
+                else if (item == "Description")
+                {
+                    componentInfo.Description = data.PayloadByName("Description").ToString();
+                }
+            }
+            return componentInfo;
+        }
+
+
+        public Dictionary<string, string> GetEventPropertiesDetails(dynamic data)
+        {
+            Dictionary<string, string> eProperties = new Dictionary<string, string>();
+            foreach (var item in data.PayloadNames)
+            {
+                Type tp = data.PayloadByName(item).GetType();
+                string value = "";
+                if (tp.Equals(typeof(byte[])))
+                {
+                    byte[] bytearray;
+                    bytearray = (byte[])(data.PayloadByName(item));
+                    value = BitConverter.ToString(bytearray);
+                }
+                else
+                {
+                    if (item == "DestinationIP" || item == "SourceIP")
+                    {
+                        value = new IPAddress(BitConverter.GetBytes((int)data.PayloadByName(item)).ToArray()).ToString();
+                    }
+                    else
+                    {
+                        value = data.PayloadByName(item).ToString();
+                    }
+                }
+                string keyName = Regex.Replace(item, "[A-Z]", " $0").Trim();
+                eProperties.Add(keyName, value);
+            }
+            return eProperties;
+        }
+        public Dictionary<string, string> GetEventInfoList(dynamic data, TraceEventType eventType)
+        {
+            Dictionary<string, string> eInfo = new Dictionary<string, string>();
+            eInfo.Add("Event Type", GetEventType(data, GetPacketCaptureType(data), eventType));
+            eInfo.Add("Event ID", data.ID.ToString());
+            eInfo.Add("Event Keyword", SetEventName((int)data.Keywords));
+            eInfo.Add("Provider Name", data.ProviderName.ToString());
+            eInfo.Add("Provider Guid", data.ProviderGuid.ToString());
+            eInfo.Add("Timestamp", data.TimeStamp.ToString());
+            eInfo.Add("Opcode", data.Opcode.ToString());
+            eInfo.Add("Level", data.Level.ToString());
+            eInfo.Add("Channel", data.Channel.ToString());
+            eInfo.Add("Processor Number", data.ProcessorNumber.ToString());
+            eInfo.Add("Process ID", data.ProcessID.ToString());
+            eInfo.Add("Thread ID", data.ThreadID.ToString());
+            return eInfo;
         }
         public List<JObject> GetPacketList(JObject results)
         {
@@ -212,6 +244,7 @@ namespace PayloadParserService
             }
             catch (Exception ex)
             {
+                WriteToFile(DateTime.Now + "Error  : " + ex.Message.ToString() + ex.InnerException.ToString(), "Error");
 
                 return null;
             }
@@ -254,7 +287,7 @@ namespace PayloadParserService
             return jObject;
         }
 
-       
+
 
 
         public JObject GetPacketObject(dynamic item)
@@ -278,6 +311,8 @@ namespace PayloadParserService
             }
             catch (Exception ex)
             {
+                WriteToFile(DateTime.Now + "Error  : " + ex.Message.ToString() + ex.InnerException.ToString(), "Error");
+
                 return null;
             }
             return packetdetail;
@@ -286,64 +321,75 @@ namespace PayloadParserService
         protected override void OnStop()
         {
             // stop service
-            WriteToFile(outputText);
+            serviceStarted = false;
+            processdataThread.Join();
         }
 
-        public void WriteToFile(string Message, string MsgType = null)
+        private static void WriteToFile(string Message, string MsgType = null)
         {
-            string path = Environment.GetEnvironmentVariable(PacketMonCommon.parserfilepath, EnvironmentVariableTarget.Machine);
-
-            if (!Directory.Exists(path))
+            try
             {
-                Directory.CreateDirectory(path);
-            }
+                string path = Environment.GetEnvironmentVariable(PacketMonCommon.parserfilepath, EnvironmentVariableTarget.Machine);
 
-            if (MsgType == "Error")
-            {
-                string filepath = path + "Error.txt";
-                if (!File.Exists(filepath))
+                if (!Directory.Exists(path))
                 {
-                    // Create a file to write to.   
-                    using (StreamWriter sw = File.CreateText(filepath))
+                    Directory.CreateDirectory(path);
+                }
+
+                if (MsgType == "Error")
+                {
+                    string filepath = path + "Error.txt";
+                    if (!File.Exists(filepath))
                     {
-                        sw.WriteLine(Message);
+                        // Create a file to write to.   
+                        using (StreamWriter sw = File.CreateText(filepath))
+                        {
+                            sw.WriteLine(Message);
+                        }
+                    }
+                    else
+                    {
+                        using (StreamWriter sw = File.AppendText(filepath))
+                        {
+                            sw.WriteLine(Message);
+                        }
                     }
                 }
                 else
                 {
-                    using (StreamWriter sw = File.AppendText(filepath))
+                    string filepath = path + "\\PktMon.txt";
+                    if (!File.Exists(filepath))
                     {
-                        sw.WriteLine(Message);
+                        // Create a file to write to.   
+                        using (StreamWriter sw = File.CreateText(filepath))
+                        {
+                            sw.WriteLine(Message);
+                        }
                     }
-                }
-            }
-            else
-            {
-                string filepath = path + "PktMon.txt";
-                if (!File.Exists(filepath))
-                {
-                    // Create a file to write to.   
-                    using (StreamWriter sw = File.CreateText(filepath))
+                    else
                     {
-                        sw.WriteLine(Message);
-                    }
-                }
-                else
-                {
-                    // Delete existing file
-                    File.Delete(filepath);
+                        // Delete existing file
+                        File.Delete(filepath);
 
-                    // Create a file to write to.   
-                    using (StreamWriter sw = File.CreateText(filepath))
-                    {
-                        sw.WriteLine(Message);
+                        // Create a file to write to.   
+                        using (StreamWriter sw = File.CreateText(filepath))
+                        {
+                            sw.WriteLine(Message);
+                        }
                     }
                 }
             }
+            catch (Exception ex)
+            {
+                WriteToFile(DateTime.Now + "Error  : " + ex.Message.ToString() + ex.InnerException.ToString(), "Error");
+
+
+            }
+
 
         }
 
-        public PacketCaptureType GetPacketCaptureType(TraceEvent eventInfo)
+        private static PacketCaptureType GetPacketCaptureType(TraceEvent eventInfo)
         {
             PacketCaptureType captureType = PacketCaptureType.None;
 
@@ -390,9 +436,10 @@ namespace PayloadParserService
                 return eventType.ToString();
             }
         }
-        public string eventname;
-        public string SetEventName(int key)
+
+        private string SetEventName(int key)
         {
+            string eventname = "";
             switch (key)
             {
                 case (int)Eventkeyword.None:
@@ -440,42 +487,42 @@ namespace PayloadParserService
         //    return eventProperties;
         //}
 
-     //   public List<JObject> GetPacketInfo(dynamic data)
-     //   {
+        //   public List<JObject> GetPacketInfo(dynamic data)
+        //   {
 
-     //       List<JObject> packetlist = new List<JObject>();
-     //       foreach (var item in data.Value)
-     //       {
-     //           if (((JToken)item).Parent.Count > 0)
-     //           {
+        //       List<JObject> packetlist = new List<JObject>();
+        //       foreach (var item in data.Value)
+        //       {
+        //           if (((JToken)item).Parent.Count > 0)
+        //           {
 
-     //               foreach (var itm in ((JToken)item).Parent)
-     //               {
+        //               foreach (var itm in ((JToken)item).Parent)
+        //               {
 
-     //               }
-     //           }
-     //           else
-     //           {
-     //               JObject packetdetail;
-     //               JObject detail = new JObject(
-     //                 new JProperty("label", item.Name),
-     //new JProperty("value", item.Value)
-     //               );
-     //               JObject dt = new JObject(
-     //                    new JProperty("Details", detail),
-     //                    new JProperty("type", "table")
-     //                   );
-     //               packetdetail = new JObject(
-     //               new JProperty("data", dt)
-     //               );
-     //               packetlist.Add(packetdetail);
+        //               }
+        //           }
+        //           else
+        //           {
+        //               JObject packetdetail;
+        //               JObject detail = new JObject(
+        //                 new JProperty("label", item.Name),
+        //new JProperty("value", item.Value)
+        //               );
+        //               JObject dt = new JObject(
+        //                    new JProperty("Details", detail),
+        //                    new JProperty("type", "table")
+        //                   );
+        //               packetdetail = new JObject(
+        //               new JProperty("data", dt)
+        //               );
+        //               packetlist.Add(packetdetail);
 
-     //           }
+        //           }
 
-     //       }
+        //       }
 
-     //       return packetlist;
-     //   }
+        //       return packetlist;
+        //   }
 
         public List<JObject> GetPacketDetails(dynamic item)
         {
@@ -501,12 +548,12 @@ namespace PayloadParserService
 
             return packetlist;
         }
-        static bool IsPacketDrop(TraceEvent e)
+        bool IsPacketDrop(TraceEvent e)
         {
             return (int)e.ID == PacketMonCommon.PktMonEvtFrameDropPayload;
         }
 
-        static bool IsPacketDuplicateDrop(TraceEvent e)
+        bool IsPacketDuplicateDrop(TraceEvent e)
         {
             return (int)e.ID == PacketMonCommon.PktMonEvtFrameDupDropPayload;
         }
