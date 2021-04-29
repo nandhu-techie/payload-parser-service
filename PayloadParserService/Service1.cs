@@ -18,7 +18,6 @@ namespace PayloadParserService
     public partial class Service1 : ServiceBase
     {
 
-
         public bool serviceStarted;
         Thread processdataThread;
       
@@ -34,7 +33,6 @@ namespace PayloadParserService
         {
             try
             {
-
                 ThreadStart start = new ThreadStart(ProcessData);
                 processdataThread = new Thread(start);
 
@@ -43,14 +41,6 @@ namespace PayloadParserService
 
                 // start threads
                 processdataThread.Start();
-
-                // string wiresharkDissetorPath = Environment.GetEnvironmentVariable(PacketMonCommon.wiresharkInstallDirEnvVar, EnvironmentVariableTarget.Machine);
-                // string etlFilePath = Environment.GetEnvironmentVariable(PacketMonCommon.parserfilepath, EnvironmentVariableTarget.Machine) + "\\PktMon.etl";
-                // this.ProcessData(etlFilePath);
-
-                //timer.Elapsed += new ElapsedEventHandler(OnElapsedTime);
-                //timer.Interval = 5000; //number in miliseconds  
-                //timer.Enabled = true;
             }
             catch (Exception ex)
             {
@@ -73,15 +63,7 @@ namespace PayloadParserService
                     {
                         Report report = new Report();
                         TraceEventType eventType = TraceEventType.ETW;
-                        //report.EventTime = data.TimeStamp;
-                        //report.EventType = GetEventType(data, GetPacketCaptureType(data), eventType);
-
                         Dictionary<string, string> eProperties = new Dictionary<string, string>();
-
-                        // get Event info
-                        //Dictionary<string, string> eInfo = GetEventInfoList(data, eventType);
-
-
 
                         if (data.PayloadNames.Length == 4)
                         {
@@ -89,11 +71,6 @@ namespace PayloadParserService
                             ComponentInfo componentInfo = GetComponentInfoDetails(data);
                             componentList.Add(componentInfo);
                         }
-                        //else
-                        //{
-                        //    // get Event properties
-                        //    eProperties = GetEventPropertiesDetails(data);
-                        //}
 
                         var payloadList = data.PayloadNames.ToList().Where(e => e == "Payload");
                         if (payloadList.Count() == 1)
@@ -287,9 +264,6 @@ namespace PayloadParserService
             return jObject;
         }
 
-
-
-
         public JObject GetPacketObject(dynamic item)
         {
             dynamic type = item.GetType().Name;
@@ -461,69 +435,6 @@ namespace PayloadParserService
             return eventname;
         }
 
-        //public EventInfo GetEventInfo(string label, string value)
-        //{
-        //    EventInfo eventInfo = new EventInfo();
-        //    Detail detail = new Detail();
-        //    Data dt = new Data();
-        //    detail.label = label;
-        //    detail.value = value;
-        //    dt.Details = detail;
-        //    dt.type = "table";
-        //    eventInfo.data = dt;
-        //    return eventInfo;
-        //}
-
-        //public EventProperties GetEventProperties(string label, string value)
-        //{
-        //    EventProperties eventProperties = new EventProperties();
-        //    Detail detail = new Detail();
-        //    Data dt = new Data();
-        //    detail.label = label;
-        //    detail.value = value;
-        //    dt.Details = detail;
-        //    dt.type = "table";
-        //    eventProperties.data = dt;
-        //    return eventProperties;
-        //}
-
-        //   public List<JObject> GetPacketInfo(dynamic data)
-        //   {
-
-        //       List<JObject> packetlist = new List<JObject>();
-        //       foreach (var item in data.Value)
-        //       {
-        //           if (((JToken)item).Parent.Count > 0)
-        //           {
-
-        //               foreach (var itm in ((JToken)item).Parent)
-        //               {
-
-        //               }
-        //           }
-        //           else
-        //           {
-        //               JObject packetdetail;
-        //               JObject detail = new JObject(
-        //                 new JProperty("label", item.Name),
-        //new JProperty("value", item.Value)
-        //               );
-        //               JObject dt = new JObject(
-        //                    new JProperty("Details", detail),
-        //                    new JProperty("type", "table")
-        //                   );
-        //               packetdetail = new JObject(
-        //               new JProperty("data", dt)
-        //               );
-        //               packetlist.Add(packetdetail);
-
-        //           }
-
-        //       }
-
-        //       return packetlist;
-        //   }
-
         public List<JObject> GetPacketDetails(dynamic item)
         {
             List<JObject> packetlist = new List<JObject>();
@@ -557,7 +468,6 @@ namespace PayloadParserService
         {
             return (int)e.ID == PacketMonCommon.PktMonEvtFrameDupDropPayload;
         }
-
 
         private void OnElapsedTime(object source, ElapsedEventArgs e)
         {
