@@ -102,14 +102,14 @@
     </dependentAssembly>
   </dependency>
   <dependency>
-    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="PayloadParserService.exe" size="33792">
+    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="PayloadParserService.exe" size="34800">
       <assemblyIdentity name="PayloadParserService" version="1.0.0.0" language="neutral" processorArchitecture="msil" />
       <hash>
         <dsig:Transforms>
           <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
         </dsig:Transforms>
         <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
-        <dsig:DigestValue>A9HD2mcpskYsA0YulBZNV9FqviB6T2oo76zBBhSYWL0=</dsig:DigestValue>
+        <dsig:DigestValue>mujjxxbDxdn5e9msFaqgs7FVDUO2BnKYqQ5C3/XwiE8=</dsig:DigestValue>
       </hash>
     </dependentAssembly>
   </dependency>
@@ -121,7 +121,7 @@
           <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
         </dsig:Transforms>
         <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
-        <dsig:DigestValue>wki5xAAYygW2i0KZaPNAPxYa/XotplAFS4cBwr3+xP8=</dsig:DigestValue>
+        <dsig:DigestValue>Wm+inzpmrCZHIiNS27G0zdLe0Z91osrAoeio2LXY+Dk=</dsig:DigestValue>
       </hash>
     </dependentAssembly>
   </dependency>

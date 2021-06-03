@@ -16,3 +16,9 @@ C:\WAC-SDN\PayloadParser\payload-parser-service\PktMonData\bin\Debug\PktMonData.
 C:\WAC-SDN\PayloadParser\payload-parser-service\PktMonData\obj\Debug\PktMonData.csproj.CoreCompileInputs.cache
 C:\WAC-SDN\PayloadParser\payload-parser-service\PktMonData\obj\Debug\PktMonData.exe
 C:\WAC-SDN\PayloadParser\payload-parser-service\PktMonData\obj\Debug\PktMonData.pdb
+F:\WAC\PayloadParserService\payload-parser-service\PktMonData\bin\Debug\PktMonData.exe.config
+F:\WAC\PayloadParserService\payload-parser-service\PktMonData\bin\Debug\PktMonData.exe
+F:\WAC\PayloadParserService\payload-parser-service\PktMonData\bin\Debug\PktMonData.pdb
+F:\WAC\PayloadParserService\payload-parser-service\PktMonData\obj\Debug\PktMonData.csproj.CoreCompileInputs.cache
+F:\WAC\PayloadParserService\payload-parser-service\PktMonData\obj\Debug\PktMonData.exe
+F:\WAC\PayloadParserService\payload-parser-service\PktMonData\obj\Debug\PktMonData.pdb
